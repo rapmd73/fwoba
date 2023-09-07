@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Jackrabbit Relay
+# 2021 Copyright © Robert APM Darin
+# All rights reserved unconditionally.
+
+import sys
+sys.path.append('/home/JackrabbitRelay2/Base/Library')
+import os
+import gc
+import json
+import time
+import datetime
+
+import JackrabbitRelay as JRR
+import JRRsupport
+
+fwobaCFG='/home/fwoba/fwoba.cfg'
+
+# Number o simultaneous process to handle pairs
+
+NumberProcesses=os.cpu_count()
+
+# Initialize global signal interceptor. prevent file trashing on CTRL-C
+
+Log=JRR.JackrabbitLog()
+
+interceptor=JRRsupport.SignalInterceptor(Log=Log)
+
+# For memory DB
+
+fwobaTimeout=1*60
+
+###
+### Collector class
+###
+
+class Collector():
+    def __init__(self,exchange,account,asset,history=None):
+        # Initialize class operationing requirements
+        self.TickerDataDir='/home/fwoba/TickerData/'
+        self.Exchange=exchange.lower()
+        self.Account=account
+        self.Asset=asset.upper()
+        self.history=85400
+        if history!=None:
+            self.history=int(history)
+        self.tickerfile=self.TickerDataDir+self.Exchange+'.'+self.Account+'.'+self.Asset.replace('/','')+'.ticker'
+        self.filelock=JRRsupport.Locker(self.tickerfile)
+        self.TickerUpdate=False
+        self.oldticker=None
+        self.ticker=None
+        self.TickerList=[]
+
+        # Initialize global signal interceptor. prevent file trashing on CTRL-C
+
+        self.Log=JRR.JackrabbitLog()
+        self.interceptor=JRRsupport.SignalInterceptor(Log=self.Log)
+
+        # Prime for Jackrabbit Relay
+        self.relay=JRR.JackrabbitRelay(exchange=self.Exchange,account=self.Account,asset=self.Asset,Usage=self.Help)
+
+    def Help(self,args,argslen):
+        print("An exchange name, an account name, and an asset are required.")
+        sys.exit(1)
+
+    # These functions are needed to load each ticker file set into the Config as each pair is loaded. This is done
+    # to prevent multiple loads os the same data.
+
+    # Load ticker data
+
+    def LoadTickerData(self):
+        self.GetTicker()
+        # Reset and reload
+        self.TickerList=[]
+        self.TickerUpdate=False
+        if os.path.exists(self.tickerfile)==True:
+            self.interceptor.Critical(True)
+            self.filelock.Lock()
+            lines=JRRsupport.ReadFile(self.tickerfile).strip().split('\n')
+            self.filelock.Unlock()
+            self.interceptor.Critical(False)
+            self.interceptor.SafeExit()
+
+            for line in lines:
+                line=line.strip()
+                if line=='':
+                    continue
+                try:
+                    td=json.loads(line)
+                    self.TickerList.append(td)
+                except: # damaged, skip
+                    pass
+
+        # get last ticker before adding current ticker
+
+        if len(self.TickerList)>1:
+            self.oldticker=self.TickerList[-1]
+
+        if self.TickerList!=[]:
+            if self.ticker['Bid']!=self.TickerList[-1]['Bid'] \
+            and self.ticker['Ask']!=self.TickerList[-1]['Ask']:
+                self.TickerList.append(self.ticker)
+                self.TickerUpdate=True
+        else:
+            self.TickerList.append(self.ticker)
+            self.TickerUpdate=True
+
+        self.TickerList=self.TickerList[-self.history:]
+        if self.TickerUpdate==True:
+            self.SaveTickerData()
+
+    # Save ticker data
+
+    def SaveTickerData(self):
+        self.interceptor.Critical(True)
+        fw=JRRsupport.Locker(self.tickerfile)
+        self.filelock.Lock()
+        fh=open(self.tickerfile,"w")
+        ot=None
+        for ticker in self.TickerList:
+            if ot==None \
+            or (ticker['Bid']!=ot['Bid'] \
+            and ticker['Ask']!=ot['Ask']):
+                fh.write(json.dumps(ticker)+'\n')
+            ot=ticker
+        fh.close()
+        self.filelock.Unlock()
+        self.interceptor.Critical(False)
+        self.interceptor.SafeExit()
+
+    def GetTicker(self):
+        self.ticker=self.relay.GetTicker(symbol=self.Asset)
+
+    def DuplicateTicker(self):
+        if self.oldticker==None or self.ticker==None:
+            return True
+
+        if self.oldticker['Bid']==self.ticker['Bid'] \
+        and self.oldticker['Ask']==self.ticker['Ask']:
+            return True
+        else:
+            return False
+
+# Read the configuration file
+
+# { "Exchange":"kraken","Account":"MAIN","Asset":"BTC/USDT","Percision":"1","History":"172800" }
+# { "Exchange":"OANDA","Account":"CherryBlossom","Asset":"EUR/USD" }
+
+def ReadConfig():
+    required=[ "Exchange","Account","Asset","History","Diagnostics" ]
+    fname=fwobaCFG
+
+    Config={}
+    lines=JRRsupport.ReadFile(fname).strip().split('\n')
+    for line in lines:
+        line=line.strip()
+        if line==None or line=='' or line[0]=='#':
+            continue
+        try:
+            cfg=json.loads(line)
+        except:
+            print(f'Config line damaged: {line}')
+            sys.exit(1)
+
+        if 'Diagnostics' not in cfg:
+            cfg['Diagnostics']='no'
+        else:
+            cfg['Diagnostics']=cfg['Diagnostics'].lower()
+
+        if "History" not in cfg:
+            cfg['History']=86400
+        else:
+            cfg['History']=int(cfg['History'])
+            if cfg['History']<86400:
+                cfg['History']=86400
+
+        for item in required:
+            if item not in cfg:
+                print(f'Item "{item}" is missing from this line:')
+                print(f'{line}')
+                sys.exit(1)
+        cfg['Key']='fwoba'
+        cfg['Pair']=cfg['Exchange']+'.'+cfg['Account']+'.'+cfg['Asset']
+        Config[cfg['Pair']]=cfg
+
+    return Config
+
+def LoadSingleTicker(Config):
+    TickerCollect=Config['Relay']
+    TickerCollect.LoadTickerData()
+
+    if Config['Diagnostics']=='yes':
+        if not TickerCollect.DuplicateTicker():
+            print(Config['Pair'],TickerCollect.ticker)
+
+def SpawnLoadSingleTicker(*args,**kwargs):
+    Config=kwargs
+
+    try:
+        LoadSingleTicker(Config)
+    except Exception as e:
+        print(e)
+
+    # Tell parent we are done
+
+    fw=JRRsupport.Locker(Config['Key'],Timeout=fwobaTimeout)
+    fwobaMemory=JRRsupport.Locker(Config['Pair'],ID=Config['mID'],Timeout=fwobaTimeout)
+    fw.Lock()
+    fwobaMemory.Put(fwobaTimeout*5,"Done")
+    fw.Unlock()
+
+###
+### Main driver
+###
+
+def main():
+    global NumberProcesses
+
+    if len(sys.argv)>2:
+        NumberProcesses=int(sys.argv[1])
+        if NumberProcesses<1:
+            NumberProcesses=os.cpu_count()
+
+    cfgName=fwobaCFG
+
+    # Clear the config arguments, otherwise the Relay method will try to process it.
+    # This is a royal PAIN IN THE ASS to debug.
+
+    for i in range(1,len(sys.argv)):
+        sys.argv.remove(sys.argv[1])
+
+    fwobaMemory={}
+    fwobaRelay={}
+    fw=JRRsupport.Locker(cfgName)
+
+    while True:
+        Config=ReadConfig()
+
+        for cfg in Config:
+            if NumberProcesses>1:
+                if cfg not in fwobaRelay:
+                    fwobaRelay[cfg]=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'])
+
+                if cfg not in fwobaMemory:
+                    fwobaMemory[cfg]=JRRsupport.Locker(cfg,Timeout=fwobaTimeout)
+
+                # Get existing state of this pair
+
+                fw.Lock()
+                sData=json.loads(fwobaMemory[cfg].Get())
+                fw.Unlock()
+                dsStatus=None
+
+                if 'DataStore' in sData:
+                    dsStatus=sData['DataStore'].lower()
+                else:
+                    status=sData['Status'].lower()
+
+                # is status is NoData or DataStore status is done, then sweep this pair again. This is absolutely critical to make
+                # sure only 1 process is managing a single pair.
+
+                if status=='notfound' or dsStatus=='done':
+                    fw.Lock()
+                    fwobaMemory[cfg].Put(fwobaTimeout*100,"Running")
+                    Config[cfg]['Relay']=fwobaRelay[cfg]
+                    Config[cfg]['mID']=fwobaMemory[cfg].ID
+                    fw.Unlock()
+                    interceptor.StartProcess(SpawnLoadSingleTicker,kwargs=Config[cfg])
+
+                # Only allow "NumberProcesses" children to run as once.
+
+                while interceptor.GetChildren()>(NumberProcesses-1):
+                    JRRsupport.ElasticSleep(1)
+            else:
+                LoadSingleTicker(Config[cfg])
+
+        JRRsupport.ElasticSleep(1)
+
+if __name__ == '__main__':
+    main()
+
+###
+### End of program
+###

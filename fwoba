@@ -1,0 +1,527 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Jackrabbit Relay
+# 2021 Copyright © Robert APM Darin
+# All rights reserved unconditionally.
+
+import sys
+sys.path.append('/home/JackrabbitRelay2/Base/Library')
+import os
+import gc
+import json
+import time
+import datetime
+import curses
+
+import JackrabbitRelay as JRR
+import JRRsupport
+
+fwobaCFG='/home/fwoba/fwoba.cfg'
+
+###
+### Frequency Weighted OrderBook Analyzer
+###
+
+class OrderBookAnalyzer():
+    def __init__(self,exchange,account,asset,direction,screen,percision=None):
+        # Initialize class operationing requirements
+        self.TickerDataDir='/home/fwoba/TickerData/'
+        self.Exchange=exchange.lower()
+        self.Account=account
+        self.Asset=asset.upper()
+        self.direction=direction.lower()
+        if percision!=None:
+            self.percision=percision
+        else:
+            self.percision=5
+        self.tickerfile=self.TickerDataDir+self.Exchange+'.'+self.Account+'.'+self.Asset.replace('/','')+'.ticker'
+        self.filelock=JRRsupport.Locker(self.tickerfile)
+        self.oldticker=None
+        self.ticker=None
+        self.TickerList=[]
+        self.OrderBook=[]
+        self.Bid={}
+        self.Ask={}
+
+        # For curses module
+        self.screen=screen
+        self.curses=None
+
+        if len(sys.argv)<4:
+            self.Help(sys.argv,len(sys.argv))
+
+        # Check percision
+
+        if len(sys.argv)>5:
+            self.percision=int(sys.argv[5])
+
+        # Clear the config argument, otherwise the Relay method will try to process it.
+        for i in range(1,len(sys.argv)):
+            sys.argv.remove(sys.argv[1])
+
+        # Initialize global signal interceptor. prevent file trashing on CTRL-C
+
+        self.Log=JRR.JackrabbitLog()
+        self.interceptor=JRRsupport.SignalInterceptor(Log=self.Log)
+
+        # Prime for Jackrabbit Relay
+        self.relay=JRR.JackrabbitRelay(exchange=self.Exchange,account=self.Account,asset=self.Asset,Usage=self.Help)
+        if self.relay.Framework!='ccxt':
+            self.percision=4
+
+        self.InitializeScreen()
+
+    def Help(self,args,argslen):
+        print("An exchange name, an account name, an asset, and direction of trade are required.")
+        sys.exit(1)
+
+    # Divide by zero trap
+
+    def Div(self,a,b):
+        try:
+            return a/b
+        except:
+            return 0
+
+    def InitializeScreen(self):
+        # Set up colors
+        curses.init_pair(1,curses.COLOR_RED,curses.COLOR_BLACK)
+        curses.init_pair(2,curses.COLOR_GREEN,curses.COLOR_BLACK)
+        curses.init_pair(3,curses.COLOR_YELLOW,curses.COLOR_BLACK)
+        curses.init_pair(4,curses.COLOR_WHITE,curses.COLOR_BLACK)
+        curses.init_pair(5,curses.COLOR_CYAN,curses.COLOR_BLUE)
+        curses.init_pair(6,curses.COLOR_CYAN,curses.COLOR_BLACK)
+        curses.noecho()
+        self.screen.nodelay(True)
+        self.screen.clear()
+
+    def GetTicker(self):
+        self.oldticker=self.ticker
+        self.ticker=self.relay.GetTicker(symbol=self.Asset)
+
+    def GetOrderBook(self):
+        self.OrderBook=self.relay.GetOrderBook(symbol=self.Asset)
+        if self.relay.Framework=='ccxt':
+            # Nids
+            obBid={}
+            for bid in self.OrderBook['bids']:
+                p=round(bid[0],self.percision)
+                if p in obBid:
+                    obBid[p]+=bid[1]
+                else:
+                    obBid[p]=bid[1]
+            obb=[(price, volume) for price, volume in obBid.items()]
+            self.OrderBook['bids']=sorted(obb, key=lambda x: x[0])
+            # Asks
+            obAsk={}
+            for ask in self.OrderBook['asks']:
+                p=round(ask[0],self.percision)
+                if p in obAsk:
+                    obAsk[p]+=ask[1]
+                else:
+                    obAsk[p]=ask[1]
+            oba=[(price, volume) for price, volume in obAsk.items()]
+            self.OrderBook['asks']=sorted(oba, key=lambda x: x[0])
+        elif self.relay.Framework=='oanda':
+            co={}
+            for cur in self.OrderBook:
+                buy=(float(cur['longCountPercent']))
+                price=round(float(cur['price']),self.percision)
+                sell=(float(cur['shortCountPercent']))
+
+                if price not in co:
+                    en={}
+                    en['price']=price
+                    en['longCountPercent']=buy
+                    en['shortCountPercent']=sell
+                    co[price]=en
+                else:
+                    co[price]['longCountPercent']+=buy
+                    co[price]['shortCountPercent']+=sell
+
+            self.OrderBook=[]
+            for p in sorted(co.keys()):
+                self.OrderBook.append(co[p])
+
+    # These functions are needed to load each ticker file set into the Config as each pair is loaded. This is done
+    # to prevent multiple loads os the same data.
+
+    # Load ticker data
+
+    def LoadTickerData(self):
+        self.GetTicker()
+        self.GetOrderBook()
+        self.TickerList=[]
+        if os.path.exists(self.tickerfile)==True:
+            self.interceptor.Critical(True)
+            self.filelock.Lock()
+            lines=JRRsupport.ReadFile(self.tickerfile).strip().split('\n')
+            self.filelock.Unlock()
+            self.interceptor.Critical(False)
+            self.interceptor.SafeExit()
+
+            for line in lines:
+                line=line.strip()
+                if line=='':
+                    continue
+                try:
+                    td=json.loads(line)
+                    self.TickerList.append(td)
+                except: # damaged, skip
+                    pass
+            self.FrequencyCount()
+
+    # Frequency count the Bid/Ask price. This is used as a multiplier for extremely aggressive position sizes.
+
+    def FrequencyCount(self):
+        if len(self.TickerList)>1:
+            self.Bid={}
+            self.Ask={}
+
+            for td in self.TickerList:
+                if not round(td['Bid'],self.percision) in self.Bid:
+                    self.Bid[round(td['Bid'],self.percision)]=1
+                else:
+                    self.Bid[round(td['Bid'],self.percision)]+=1
+
+                if not round(td['Ask'],self.percision) in self.Ask:
+                    self.Ask[round(td['Ask'],self.percision)]=1
+                else:
+                    self.Ask[round(td['Ask'],self.percision)]+=1
+
+    def DisplayOanda(self):
+        maxY,maxX=self.screen.getmaxyx()
+        Blank=" "
+        xpos=0
+
+        BuyPrice=round(self.ticker['Bid'],self.percision)
+        SellPrice=round(self.ticker['Ask'],self.percision)
+
+        ### Get order book
+
+        lp=0
+        sp=0
+        l=len(self.OrderBook)
+        buyIDX=0
+        sellIDX=0
+
+        obl=[]
+        pp=0
+        idx=0
+        buyTotal=0
+        sellTotal=0
+        for cur in self.OrderBook:
+            buy=(float(cur['longCountPercent']))
+            price=round(float(cur['price']),self.percision)
+            sell=(float(cur['shortCountPercent']))
+
+           # Frequency
+            buyFreq=self.Bid[price] if price in self.Bid else 0
+            sellFreq=self.Ask[price] if price in self.Ask else 0
+
+            # Weighting
+            buyWeight=buy*buyFreq
+            buyTotal+=buyWeight
+            sellWeight=sell*sellFreq
+            sellTotal+=sellWeight
+
+            cp=price
+            if pp<BuyPrice and BuyPrice<=cp:
+                buyIDX=idx-1
+            if pp<SellPrice and SellPrice<=cp:
+                sellIDX=idx
+
+            lp+=buy
+            sp+=sell
+
+            obl.append([buy,price,sell,buyWeight,sellWeight,buyFreq,sellFreq])
+            pp=cp
+            idx+=1
+
+        # Frequency
+        buyFreq=self.Bid[BuyPrice] if BuyPrice in self.Bid else 0
+        sellFreq=self.Ask[SellPrice] if SellPrice in self.Ask else 0
+
+        buy=obl[buyIDX][0]
+        sell=obl[sellIDX][2]
+
+        buyWeight=obl[buyIDX][3]
+        sellWeight=obl[sellIDX][4]
+
+        ### Print table
+
+        self.screen.addstr(0,xpos,f"{Blank:3} {'FreqWeight':>16} {'Frequency':>16} {'Volume':>16} {'Buy':>16} {'Spread':>16} {'Sell':>16} {'Volume':>16} {'Frequency':>16} {'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
+        self.screen.addstr(1,xpos,f"{Blank:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f} {BuyPrice-SellPrice:16.{self.percision}f} {SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(6)|curses.A_BOLD)
+
+        if self.direction=='long':
+            self.screen.addstr(1,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f}",curses.color_pair(3)|curses.A_BOLD)
+        else:
+            self.screen.addstr(1,xpos+89,f"{SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(3)|curses.A_BOLD)
+
+        depth=maxY-2
+
+        c=1
+        maxBorders=0
+        maxSorders=0
+        maxBprice=0
+        maxSprice=0
+        for i in range(depth):
+            buy=obl[buyIDX-i][0]
+            bprice=obl[buyIDX-i][1]
+            sprice=obl[sellIDX+i][1]
+            sell=obl[sellIDX+i][2]
+
+            buyWeight=obl[buyIDX-i][3]
+            sellWeight=obl[sellIDX+i][4]
+
+            buyFreq=obl[buyIDX-i][5]
+            sellFreq=obl[sellIDX+i][6]
+
+            if buyWeight>maxBorders:
+                maxBorders=buyWeight
+                maxBprice=bprice
+            if sellWeight>maxSorders:
+                maxSorders=sellWeight
+                maxSprice=sprice
+
+        for i in range(depth):
+            buy=obl[buyIDX-i][0]
+            bprice=obl[buyIDX-i][1]
+            sprice=obl[sellIDX+i][1]
+            sell=obl[sellIDX+i][2]
+            buyWeight=obl[buyIDX-i][3]
+            sellWeight=obl[sellIDX+i][4]
+            buyFreq=obl[buyIDX-i][5]
+            sellFreq=obl[sellIDX+i][6]
+            spread=abs(sprice-bprice)
+
+            self.screen.addstr(2+i,xpos,f"{c:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f} {spread:16.{self.percision}f} {sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(4))
+            if bprice==maxBprice:
+                self.screen.addstr(2+i,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f}",curses.color_pair(2)|curses.A_BOLD)
+            elif sprice==maxSprice:
+                self.screen.addstr(2+i,xpos+89,f"{sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(2)|curses.A_BOLD)
+            c+=1
+
+        self.screen.refresh()
+
+    def DisplayCCXT(self):
+        maxY,maxX=self.screen.getmaxyx()
+        Blank=" "
+        xpos=0
+
+        BuyPrice=round(self.ticker['Bid'],self.percision)
+        SellPrice=round(self.ticker['Ask'],self.percision)
+
+        ### Get order book
+
+        lp=0
+        sp=0
+        l=min(len(self.OrderBook['asks']),len(self.OrderBook['bids']))
+        buyIDX=0
+        sellIDX=0
+
+        oblB=[]
+        oblS=[]
+        ppB=0
+        ppS=0
+        idx=0
+        buyTotal=0
+        sellTotal=0
+
+        for ob in range(l):
+            bprice=round(self.OrderBook['bids'][ob][0],self.percision)
+            buy=self.OrderBook['bids'][ob][1] #*bprice
+
+            sprice=round(self.OrderBook['asks'][ob][0],self.percision)
+            sell=self.OrderBook['asks'][ob][1] #*sprice
+
+            # Frequency
+            buyFreq=self.Bid[bprice] if bprice in self.Bid else 0
+            sellFreq=self.Ask[sprice] if sprice in self.Ask else 0
+
+            # Weighting
+            buyWeight=buy*buyFreq
+            buyTotal+=buyWeight
+            sellWeight=sell*sellFreq
+            sellTotal+=sellWeight
+
+            cpB=bprice
+            if ppB<BuyPrice and BuyPrice<=cpB:
+                buyIDX=idx
+
+            cpS=sprice
+            if ppS<SellPrice and SellPrice<=cpS:
+                sellIDX=idx
+
+            lp+=buy
+            sp+=sell
+
+            oblB.append([buy,bprice,buyWeight,buyFreq])
+            oblS.append([sell,sprice,sellWeight,sellFreq])
+            ppB=cpB
+            ppS=cpS
+            idx+=1
+
+        # Frequency
+        buyFreq=self.Bid[BuyPrice] if BuyPrice in self.Bid else 0
+        sellFreq=self.Ask[SellPrice] if SellPrice in self.Ask else 0
+
+        buy=oblB[buyIDX][0]
+        buyWeight=oblB[buyIDX][2]
+
+        sell=oblS[sellIDX][0]
+        sellWeight=oblS[sellIDX][2]
+
+        ### Print table
+
+        self.screen.addstr(0,xpos,f"{Blank:3} {'FreqWeight':>16} {'Frequency':>16} {'Volume':>16} {'Buy':>16} {'Spread':>16} {'Sell':>16} {'Volume':>16} {'Frequency':>16} {'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
+        self.screen.addstr(1,xpos,f"{Blank:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f} {BuyPrice-SellPrice:16.{self.percision}f} {SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(6)|curses.A_BOLD)
+
+        if self.direction=='long':
+            self.screen.addstr(1,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f}",curses.color_pair(3)|curses.A_BOLD)
+        else:
+            self.screen.addstr(1,xpos+89,f"{SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(3)|curses.A_BOLD)
+
+        depth=min(maxY-2,len(oblB)-1,len(oblS)-1)
+
+        c=1
+        maxBorders=0
+        maxSorders=0
+        maxBprice=0
+        maxSprice=0
+        for i in range(depth):
+            try:
+                buy=oblB[buyIDX+i][0]
+                bprice=oblB[buyIDX+i][1]
+                buyWeight=oblB[buyIDX+i][2]
+                buyFreq=oblB[buyIDX+i][3]
+
+                sell=oblS[sellIDX+i][0]
+                sprice=oblS[sellIDX+i][1]
+                sellWeight=oblS[sellIDX+i][2]
+                sellFreq=oblS[sellIDX+i][3]
+
+                if buyWeight>maxBorders:
+                    maxBorders=buyWeight
+                    maxBprice=bprice
+                if sellWeight>maxSorders:
+                    maxSorders=sellWeight
+                    maxSprice=sprice
+            except:
+                break
+
+        for i in range(depth):
+            try:
+                buy=oblB[buyIDX+i][0]
+                bprice=oblB[buyIDX+i][1]
+                buyWeight=oblB[buyIDX+i][2]
+                buyFreq=oblB[buyIDX+i][3]
+
+                sell=oblS[sellIDX+i][0]
+                sprice=oblS[sellIDX+i][1]
+                sellWeight=oblS[sellIDX+i][2]
+                sellFreq=oblS[sellIDX+i][3]
+                spread=abs(sprice-bprice)
+
+                self.screen.addstr(2+i,xpos,f"{c:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f} {spread:16.{self.percision}f} {sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(4))
+                if bprice==maxBprice:
+                    self.screen.addstr(2+i,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f}",curses.color_pair(2)|curses.A_BOLD)
+                elif sprice==maxSprice:
+                    self.screen.addstr(2+i,xpos+89,f"{sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(2)|curses.A_BOLD)
+                c+=1
+            except:
+                break
+
+        self.screen.refresh()
+
+def SortPrice(n):
+    return n[0]
+
+# Read the configuration file
+
+# { "Exchange":"kraken","Account":"MAIN","Asset":"BTC/USDT","Percision":"1","History":"172800" }
+# { "Exchange":"OANDA","Account":"CherryBlossom","Asset":"EUR/USD" }
+
+def ReadConfig(exchange,account,asset):
+    required=[ "Exchange","Account","Asset","Percision","History" ]
+    fname=fwobaCFG
+
+    Config={}
+    lines=JRRsupport.ReadFile(fname).strip().split('\n')
+    for line in lines:
+        line=line.strip()
+        if line==None or line=='' or line[0]=='#':
+            continue
+        try:
+            cfg=json.loads(line)
+        except:
+            print(f'Config line damaged: {line}')
+            sys.exit(1)
+
+        if "History" not in cfg:
+            cfg['History']=86400
+        else:
+            cfg['History']=int(cfg['History'])
+            if cfg['History']<86400:
+                cfg['History']=86400
+
+        if "Percision" not in cfg:
+            cfg['Percision']=4
+        else:
+            cfg['Percision']=int(cfg['Percision'])
+
+        for item in required:
+            if item not in cfg:
+                print(f'Item "{item}" is missing from this line:')
+                print(f'{line}')
+                sys.exit(1)
+
+        if cfg['Exchange']==exchange and cfg['Account']==account and cfg['Asset']==asset:
+            return cfg
+
+    print(f"{exchange}, {account}, {asset} not in fwoba.cfg, can not analyze.")
+    sys.exit(1)
+
+###
+### Main driver
+###
+
+def main(screen):
+    exchange=sys.argv[1].lower()
+    account=sys.argv[2]
+    asset=sys.argv[3].upper()
+    direction=sys.argv[4].lower()
+
+    Config=ReadConfig(exchange,account,asset)
+
+    fwoba=OrderBookAnalyzer(screen=screen,exchange=exchange,account=account,asset=asset,direction=direction,percision=Config['Percision'])
+
+    while True:
+        # Get 0-8 gor percision
+        ch=fwoba.screen.getch()
+        if ch==ord('q') or ch==ord('Q'):
+            curses.endwin()
+            sys.exit(0)
+
+        if ch>=ord('0') and ch<=ord('8'):
+            fwoba.percision=ch-ord('0')
+            fwoba.screen.clear()
+
+        fwoba.LoadTickerData()
+        if fwoba.relay.Framework=='ccxt':
+            fwoba.DisplayCCXT()
+        else:
+            fwoba.DisplayOanda()
+
+        JRRsupport.ElasticSleep(1)
+
+    # shut everything down
+    curses.endwin()
+
+if __name__ == '__main__':
+    curses.wrapper(main)
+
+###
+### End of program
+###
