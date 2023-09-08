@@ -1,7 +1,7 @@
 # Frequency Weighted OrderBook Analysis (FWOBA)
 
-This program is a full working example of orderbook analysis built on top of the [Jackrabbit Relay](https://github.com/rapmd73/JackrabbitRelay/wiki)
-framework.
+This is a collection programs then download and analyze orderbook data in near real-time and is a full working example of orderbook analysis built on
+top of the [Jackrabbit Relay](https://github.com/rapmd73/JackrabbitRelay/wiki) framework.
 
 ## Programs
 
