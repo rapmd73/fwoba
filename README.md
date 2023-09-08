@@ -17,9 +17,13 @@ framework.
 ### Overview
 
 This dataset provides a snapshot of the order book for a given asset, which is updated in near real-time with a specified time interval. It consists of
-several columns, each containing essential information for analyzing the order book and making trading decisions.
+several columns, each containing essential information for analyzing the order book and making trading decisions. Here is a list of the keys and their
+purpose in the program:
 
-#### Columns
+1. **q** or **Q**. Gracefully quit the program and return to the command prompt.
+1. **1** to **8**. Digits after the decimal for vireing and correlating different zonwes and regions in the orderbook.
+
+### Columns
 
 - **FreqWeight:** Represents the weighted value associated with each data point.
 - **Frequency:** Indicates the frequency count for each data point.
@@ -28,7 +32,7 @@ several columns, each containing essential information for analyzing the order b
 - **Spread:** Represents the spread between buy and sell values.
 - **Sell:** Displays sell values on the ask side of the order book.
 
-#### Significance
+### Significance
 
 1. Support and Resistance Levels. The data is instrumental in identifying support and resistance levels within the asset's market. Support levels are
 where buying interest is potentially strong, preventing further price declines. Resistance levels are areas where selling interest may be robust,
@@ -66,12 +70,12 @@ high volatility or low liquidity, traders can adjust their position sizes or opt
 1. Algorithmic Trading Strategies. Quantitative traders and algorithmic trading systems can use order book data as input for developing and fine-tuning
 trading algorithms. Algorithms can be designed to respond to changes in the order book, allowing for automated trading decisions.
 
-#### Real-Time Updates
+### Real-Time Updates
 
 The dataset's near real-time nature, with updates at regular intervals, makes it valuable for traders to stay current with market dynamics. This allows
 for timely decision-making based on shifts in the order book, offering a competitive advantage in the asset's market.
 
-#### Analysis and Decision-Making
+### Analysis and Decision-Making
 
 1. **Volume Analysis:** Market manipulation may involve unusual volume spikes at specific price levels. For instance, if there's an abrupt and excessive
 increase in buy volume at a particular support level followed by a sudden sell-off, it could be an attempt to lure traders into buying before a planned
@@ -91,31 +95,31 @@ can be detected by monitoring frequent order cancellations at specific price lev
    *Example*: Large buy orders appear at a key support level but are canceled within seconds, leading traders to believe that significant buying
    interest exists.
 
-#### Exposing Market Manipulation
+### Exposing Market Manipulation
 
 Identifying market manipulation through order book data requires vigilance and a keen eye for unusual patterns. Traders and regulators should be
 cautious of sudden, anomalous trading behavior that doesn't align with typical market dynamics. Reporting suspicious activity is essential to maintain
 market integrity.
 
-##### Example 1: Pump and Dump
+#### Example 1: Pump and Dump
 
 **Scenario:** A group of manipulators artificially inflates the price of an asset by executing a series of large buy orders, creating the illusion of
 strong demand. **Detection:** Traders should be cautious if they observe a rapid and significant increase in both volume and price, especially if it
 deviates from historical trends. It's essential to verify whether the increased buying activity is backed by genuine market sentiment.
 
-##### Example 2: Spread Manipulation
+#### Example 2: Spread Manipulation
 
 **Scenario:** Market manipulators intentionally widen the spread between buy and sell orders to discourage trading or create panic. **Detection:**
 Traders can spot spread manipulation by monitoring the spread's behavior during normal market conditions. Abrupt and exaggerated spread widening that
 doesn't align with news or events should raise suspicion.
 
-##### Example 3: Spoofing
+#### Example 3: Spoofing
 
 **Scenario:** A manipulator places a large sell order at a key resistance level to create the impression of impending price decline, only to cancel it
 before execution. **Detection:** Traders should be wary of frequent order cancellations, especially if they occur immediately after substantial orders
 are placed. This suggests an attempt to manipulate market sentiment.
 
-#### Exposing Market Manipulation
+### Exposing Market Manipulation
 
 Identifying market manipulation through order book data requires vigilance and a keen eye for unusual patterns. Traders and regulators should be
 cautious of sudden, anomalous trading behavior that doesn't align with typical market dynamics. Reporting suspicious activity is essential to maintain
