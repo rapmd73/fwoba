@@ -12,6 +12,16 @@ framework.
 | fwoba.collector | The actual collection program that stores the ticker data |
 | LaunchCollector | BASH script suitable for launching in a crontab at reboot |
 
+## Example Screens
+
+This screen shot shows BTC/USDT being analyzed and monitored by FWOBA. A percision of 3 digits is used to better visualize the volume of each entry.
+
+![BTC/USDT](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.BTCUSDT.jpg)
+
+This screen shot shows EUR/USD being analyzed and monitored by FWOBA. This analyzes is at the pip level or four digits behind the decimal point.
+
+![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.EURUSD.jpg)
+
 ## fwoba
 
 ### Overview
