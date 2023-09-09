@@ -100,7 +100,7 @@ script at system reboot, use the `@reboot` directive.
 - Save the changes to the crontab file and exit the text editor. The method for saving and exiting depends on the text editor you're using. For example,
 in the nano editor, you can press `Ctrl + O` to save and `Ctrl + X` to exit.
 
-1. **Verification**:
+2. **Verification**:
 
 - You can verify that the cron job has been added successfully by listing the root user's crontab:
 
