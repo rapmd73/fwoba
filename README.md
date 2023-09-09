@@ -7,10 +7,10 @@ top of the [Jackrabbit Relay](https://github.com/rapmd73/JackrabbitRelay/wiki) f
 
 | Name | Description |
 | --- | --- |
-| fwoba | This is the main interactive analysis program that displays orderbook information in relation to a weighted frequency count. |
 | fwoba.cfg | The config file for the collector and analysis program |
-| fwoba.collector | The actual collection program that stores the ticker data |
 | LaunchCollector | BASH script suitable for launching in a crontab at reboot |
+| fwoba.collector | The actual collection program that stores the ticker data |
+| fwoba | This is the main interactive analysis program that displays orderbook information in relation to a weighted frequency count. |
 
 ## Example Screens
 
@@ -21,6 +21,97 @@ This screen shot shows BTC/USDT being analyzed and monitored by FWOBA. A percisi
 This screen shot shows EUR/USD being analyzed and monitored by FWOBA. This analyzes is at the pip level or four digits behind the decimal point.
 
 ![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.EURUSD.jpg)
+
+## fwoba.cfg
+
+### Configuration File Description
+
+The configuration file provided here plays a pivotal role in defining the behavior and parameters of the program responsible for collecting and
+analyzing order book data from various exchanges. This file is instrumental in ensuring the program operates effectively and efficiently. Here's a
+breakdown of the key elements within the configuration file:
+
+- **Exchange**: This field specifies the source of the order book data. It can take one of two values: "OANDA" or one of the 100+ different
+cryptocurrency exchanges. For example, if set to "Kraken," it indicates that the program will collect data from the Kraken exchange.
+
+- **Account**: The "Account" field serves as a reference to the account information within the Jackrabbit Relay exchange file. When using exchanges like
+Kraken, this field should match the corresponding Kraken.cfg file within Jackrabbit Relay. It helps establish the connection to the specific exchange
+account.
+
+- **Asset**: The "Asset" field designates the trading instrument or asset for which order book data will be collected. It should align with the
+supported trading pairs on the chosen exchange. For instance, "EUR/USD" indicates the Euro to US Dollar trading pair.
+
+- **Precision**: This field controls the number of decimal places used in calculations for range, support, and resistance levels based on the order book
+data. It's an essential parameter for tailoring the analysis to specific trading preferences. A higher precision value means more detailed calculations.
+
+- **History**: The "History" field defines the duration for which bid and ask data is stored on disk. It's a crucial parameter that balances historical
+data retention with storage requirements. The value is expressed in seconds, and its significance cannot be overstated.
+
+- **Diagnostics**: The "Diagnostics" field serves as a visual reference. When set to "No," it indicates that no additional diagnostic information will
+be displayed. However, if running the program from a screen or command line and set to "Yes," it will print ticker data on the screen, aiding in
+monitoring and debugging.
+
+### Importance of Historical Data and Storage Requirements
+
+The "History" parameter is particularly significant in this configuration file, as it directly impacts the quality of analysis and storage requirements.
+Here's why historical data and its careful management are critical:
+
+- **Data Quality**: The historical data duration, defined by the "History" field, influences the quality of the analysis. Inadequate historical data,
+with too short a duration, can result in poor results. Without sufficient historical context, it becomes challenging to identify meaningful patterns and
+trends in the order book.
+
+- **Storage Balancing**: On the other hand, storing excessive historical data unnecessarily can lead to substantial storage requirements. This can be
+costly and inefficient. Therefore, selecting an appropriate duration for historical data strikes a balance between data quality and storage efficiency.
+
+- **Informed Decision-Making**: Historical data is the foundation for informed decision-making in trading. It allows traders to understand past market
+behavior, identify support and resistance levels, and assess order flow dynamics. Without a sufficient historical dataset, traders risk making
+less-informed decisions.
+
+- **Backtesting Strategies**: Historical data is essential for backtesting trading strategies. Traders can evaluate how their strategies would have
+performed in past market conditions. Incomplete historical data limits the accuracy of backtesting and the ability to refine strategies effectively.
+
+## LaunchCollector
+
+### Installing "LaunchCollector" in Cron
+
+To ensure that the "fwoba.collector" program runs continuously and automatically at system reboot, you can add the "LaunchCollector" script to the cron
+tab for the root user. Follow these steps:
+
+1. **Edit the Crontab Configuration**:
+
+- Open the cron configuration for the root user using the terminal:
+
+```bash
+sudo crontab -e
+```
+
+1. **Add a Cron Job Entry**:
+
+- In the text editor that opens, add a new cron job entry. This entry specifies when and how often the script should run. To run the "LaunchCollector"
+script at system reboot, use the `@reboot` directive.
+
+- Example entry:
+
+```bash
+@reboot /bin/bash /home/fwoba/LaunchCollector
+```
+
+1. **Save and Exit**:
+
+- Save the changes to the crontab file and exit the text editor. The method for saving and exiting depends on the text editor you're using. For example,
+in the nano editor, you can press `Ctrl + O` to save and `Ctrl + X` to exit.
+
+1. **Verification**:
+
+- You can verify that the cron job has been added successfully by listing the root user's crontab:
+
+```bash
+sudo crontab -l
+```
+
+This command should display the cron job entry you just added.
+
+Now, the "LaunchCollector" script will be executed automatically at system reboot as the root user, ensuring that the "fwoba.collector" program runs
+continuously even after system restarts.
 
 ## fwoba.collector
 
