@@ -192,6 +192,12 @@ class OrderBookAnalyzer():
 
     def DisplayOanda(self):
         maxY,maxX=self.screen.getmaxyx()
+
+        if maxX<160:
+            print("Your screen is not wide enough. Please resize your window to at least 160 characters.")
+            curses.endwin()
+            sys.exit(1)
+
         Blank=" "
         xpos=0
 
@@ -307,6 +313,12 @@ class OrderBookAnalyzer():
 
     def DisplayCCXT(self):
         maxY,maxX=self.screen.getmaxyx()
+
+        if maxX<160:
+            print("Your screen is not wide enough. Please resize your window to at least 160 characters.")
+            curses.endwin()
+            sys.exit(1)
+
         Blank=" "
         xpos=0
 
