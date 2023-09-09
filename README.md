@@ -3,14 +3,14 @@
 This is a collection programs that download and analyze orderbook data in near real-time and is a full working example of orderbook analysis built on
 top of the [Jackrabbit Relay](https://github.com/rapmd73/JackrabbitRelay/wiki) framework.
 
-## Programs
+## Programs/Files
 
 | Name | Description |
 | --- | --- |
-| fwoba.cfg | The config file for the collector and analysis program |
-| LaunchCollector | BASH script suitable for launching in a crontab at reboot |
-| fwoba.collector | The actual collection program that stores the ticker data |
-| fwoba | This is the main interactive analysis program that displays orderbook information in relation to a weighted frequency count. |
+| [fwoba.cfg](https://github.com/rapmd73/fwoba/#fwobacfg) | The config file for the collector and analysis program |
+| [LaunchCollector](https://github.com/rapmd73/fwoba/#launchcollector) | BASH script suitable for launching in a crontab at reboot |
+| [fwoba.collector](https://github.com/rapmd73/fwoba/#fwobacollector) | The actual collection program that stores the ticker data |
+| [fwoba](https://github.com/rapmd73/fwoba/#fwoba) | This is the main interactive analysis program that displays orderbook information in relation to a weighted frequency count. |
 
 ## Example Screens
 
@@ -84,7 +84,7 @@ tab for the root user. Follow these steps:
 sudo crontab -e
 ```
 
-1. **Add a Cron Job Entry**:
+2. **Add a Cron Job Entry**:
 
 - In the text editor that opens, add a new cron job entry. This entry specifies when and how often the script should run. To run the "LaunchCollector"
 script at system reboot, use the `@reboot` directive.
