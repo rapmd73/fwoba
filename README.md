@@ -56,9 +56,34 @@ Traders typically integrate the Ticker Data Collector into their trading systems
 
 ### Overview
 
-This dataset provides a snapshot of the order book for a given asset, which is updated in near real-time with a specified time interval. It consists of
-several columns, each containing essential information for analyzing the order book and making trading decisions. Here is a list of the keys and their
-purpose in the program:
+The Order Book Analyzer is a powerful tool designed for experienced traders and programmers seeking in-depth insights into order book dynamics on
+various cryptocurrency exchanges. This tool is part of the Jackrabbit Relay project, providing real-time trading data analysis capabilities.
+
+### Features
+
+- **Exchange Agnostic**: Supports multiple cryptocurrency exchanges, providing a unified analysis platform.
+
+- **Custom Precision**: Adjust the precision level to control the number of decimal places in the analysis, enabling tailored data views.
+
+- **Real-time Data**: Access real-time ticker and order book data to make informed trading decisions.
+
+- **Educational**: Use it for learning purposes to explore order book mechanics, market depth, and trading strategies.
+
+- **Curses-based UI**: Utilizes the curses library to create a user-friendly, terminal-based interface for displaying data.
+
+### Usage
+
+**Run the Script**: Execute the script with the following command, replacing `<exchange>`, `<account>`, `<asset>`, and `<direction>` with your
+trading parameters:
+
+```bash
+./fwoba <exchange> <account> <asset> <direction>
+```
+
+The Frequency Weighted OrderBook Analyzer (FWOBA) is a powerful tool designed for experienced traders and programmers seeking in-depth insights into
+order book dynamics on various cryptocurrency exchanges and provides a snapshot of the order book for a given asset, which is updated in near real-time
+with a specified time interval. It consists of several columns, each containing essential information for analyzing the order book and making trading
+decisions. Here is a list of the keys and their purpose in the program:
 
 1. **q** or **Q**. Gracefully quit the program and return to the command prompt.
 1. **1** to **8**. Digits after the decimal for vireing and correlating different zonwes and regions in the orderbook.
@@ -165,8 +190,8 @@ Identifying market manipulation through order book data requires vigilance and a
 cautious of sudden, anomalous trading behavior that doesn't align with typical market dynamics. Reporting suspicious activity is essential to maintain
 market integrity.
 
-### Usage
+### Utilization
 
-This dataset is intended for learning purposes and can be employed to develop trading strategies, conduct technical analysis, and enhance trading
+This program is intended for learning purposes and can be employed to develop trading strategies, conduct technical analysis, and enhance trading
 education materials. Additionally, it plays a crucial role in maintaining market transparency and fairness by aiding in the detection of market
 manipulation.
