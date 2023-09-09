@@ -22,6 +22,36 @@ This screen shot shows EUR/USD being analyzed and monitored by FWOBA. This analy
 
 ![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.EURUSD.jpg)
 
+## fwoba.collector
+
+### Overview
+
+The Ticker Data Collector is a software tool designed to gather and manage real-time price information, known as ticker data, from various
+cryptocurrency exchanges. This tool is typically used as part of a larger trading system, such as the Jackrabbit Relay, to ensure that traders have
+access to up-to-date and accurate pricing information for different cryptocurrency trading pairs.
+
+### Key Features
+
+1. **Data Collection**: The primary function of this tool is to collect and maintain ticker data. Ticker data represents the current prices (bid and
+ask) of cryptocurrencies on specific exchanges.
+
+1. **Configuration**: The tool is configurable through a settings file. This file contains information about which trading pairs to monitor, the
+associated exchanges, and additional settings. Users can customize it to suit their trading needs.
+
+1. **Concurrency**: To efficiently manage multiple trading pairs, the tool can run multiple processes simultaneously. This allows it to gather data for
+multiple pairs at the same time, leveraging the processing power of the computer.
+
+1. **Diagnostics**: For users interested in monitoring changes in ticker data, the tool offers a diagnostics option. This feature helps identify when
+prices for a particular trading pair have changed.
+
+### Purpose
+
+The primary purpose of the Ticker Data Collector is to provide traders with accurate and real-time pricing information. This information is essential for making informed decisions when buying or selling cryptocurrencies. By continuously collecting and updating ticker data, the tool supports traders in executing their trading strategies effectively.
+
+### Usage
+
+Traders typically integrate the Ticker Data Collector into their trading systems. They configure the tool to monitor the specific trading pairs they are interested in and set it to run continuously. Importantly, it is designed to run automatically from `cron` at server reboot. As the tool collects and updates ticker data, it becomes a crucial resource for traders to monitor market conditions and make timely trading decisions.
+
 ## fwoba
 
 ### Overview
