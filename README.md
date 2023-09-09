@@ -22,6 +22,26 @@ This screen shot shows EUR/USD being analyzed and monitored by FWOBA. This analy
 
 ![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.EURUSD.jpg)
 
+## Installing
+
+**DO THIS ONLY ONCE**. It will overwrite the .cfg file
+
+Start with these shell commands
+
+```bash
+mkdir -p /home/GitHub
+cd /home/GitHub
+git clone https://github.com/rapmd73/fwoba
+```
+
+You now have a copy of the FWOBA repository. Now its time to install
+everything.
+
+```bash
+cd /home/GitHub/fwoba
+./install
+```
+
 ## fwoba.cfg
 
 ### Configuration File Description
