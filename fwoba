@@ -190,6 +190,13 @@ class OrderBookAnalyzer():
                 else:
                     self.Ask[round(td['Ask'],self.percision)]+=1
 
+    def WipeScreen(self):
+        maxY,maxX=self.screen.getmaxyx()
+        for y in range(maxY):
+            self.screen.move(y,0)
+            self.screen.clrtoeol()
+        self.screen.move(0,0)
+
     def DisplayOanda(self):
         maxY,maxX=self.screen.getmaxyx()
 
@@ -254,6 +261,9 @@ class OrderBookAnalyzer():
 
         buyWeight=obl[buyIDX][3]
         sellWeight=obl[sellIDX][4]
+
+        # Wipe the screen
+        self.WipeScreen()
 
         ### Print table
 
@@ -384,6 +394,9 @@ class OrderBookAnalyzer():
 
         sell=oblS[sellIDX][0]
         sellWeight=oblS[sellIDX][2]
+
+        # Wipe the screen
+        self.WipeScreen()
 
         ### Print table
 
