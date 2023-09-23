@@ -14,13 +14,33 @@ top of the [Jackrabbit Relay](https://github.com/rapmd73/JackrabbitRelay/wiki) f
 
 ## Example Screens
 
-This screen shot shows BTC/USDT being analyzed and monitored by FWOBA. A percision of 3 digits is used to better visualize the volume of each entry.
+This screen shot shows BTC/USDT being analyzed and monitored by FWOBA. 
 
-![BTC/USDT](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.BTCUSDT.jpg)
+![BTC/USDT](https://github.com/rapmd73/fwoba/blob/main/WikiImages/BTCUSDT.jpg)
 
-This screen shot shows EUR/USD being analyzed and monitored by FWOBA. This analyzes is at the pip level or four digits behind the decimal point.
+This screen shot shows ETH/USDT being analyzed and monitored by FWOBA. 
 
-![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/Images/fwoba.EURUSD.jpg)
+![ETH/USDT](https://github.com/rapmd73/fwoba/blob/main/WikiImages/ETHUSDT.jpg)
+
+This screen shot shows TRX/USD being analyzed and monitored by FWOBA. 
+
+![TRX/USD](https://github.com/rapmd73/fwoba/blob/main/WikiImages/TRXUSD.jpg)
+
+This screen shot shows XRP/USD being analyzed and monitored by FWOBA. 
+
+![XRP/USDT](https://github.com/rapmd73/fwoba/blob/main/WikiImages/XRPUSDT.jpg)
+
+This screen shot shows EUR/USD being analyzed by frequency weight.
+
+![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/WikiImages/EURUSDfw.jpg)
+
+This screen shot shows EUR/USD being analyzed by frequency count.
+
+![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/WikiImages/EURUSDfc.jpg)
+
+This screen shot shows EUR/USD being analyzed by volume.
+
+![EUR/USD](https://github.com/rapmd73/fwoba/blob/main/WikiImages/EURUSDvol.jpg)
 
 ## Installing
 
@@ -198,6 +218,7 @@ decisions. Here is a list of the keys and their purpose in the program:
 
 1. **q** or **Q**. Gracefully quit the program and return to the command prompt.
 1. **1** to **8**. Digits after the decimal for vireing and correlating different zonwes and regions in the orderbook.
+1. **Space Bar**. Cycle through the various displays highlight by frequency weight, frequeny, and volume.
 
 ### Columns
 
