@@ -41,8 +41,11 @@ class OrderBookAnalyzer():
         self.ticker=None
         self.TickerList=[]
         self.OrderBook=[]
+        self.htype=0
         self.Bid={}
         self.Ask={}
+        self.maxLvisable=False
+        self.maxRvisable=False
 
         # For curses module
         self.screen=screen
@@ -92,6 +95,7 @@ class OrderBookAnalyzer():
         curses.init_pair(4,curses.COLOR_WHITE,curses.COLOR_BLACK)
         curses.init_pair(5,curses.COLOR_CYAN,curses.COLOR_BLUE)
         curses.init_pair(6,curses.COLOR_CYAN,curses.COLOR_BLACK)
+        curses.init_pair(7,curses.COLOR_BLACK,curses.COLOR_BLACK)
         curses.noecho()
         self.screen.nodelay(True)
         self.screen.clear()
@@ -191,17 +195,98 @@ class OrderBookAnalyzer():
                     self.Ask[round(td['Ask'],self.percision)]+=1
 
     def WipeScreen(self):
-        maxY,maxX=self.screen.getmaxyx()
-        for y in range(maxY):
-            self.screen.move(y,0)
-            self.screen.clrtoeol()
+        # Reset at every cycle
+        self.maxLvisable=False
+        self.maxRvisable=False
+
         self.screen.move(0,0)
+        self.screen.clrtobot()
+
+    def ShowHeader(self,buyTotal,buyWeight,buyFreq,buy,BuyPrice,SellPrice,sell,sellFreq,sellWeight,sellTotal):
+        self.WipeScreen()
+
+        if self.direction=='long':
+            cl=3
+            cr=6
+        else:
+            cl=6
+            cr=3
+
+        self.screen.addstr(0,0,f"{' '*89}",curses.color_pair(5)|curses.A_BOLD)
+
+        self.screen.addstr(0,21,f"{'Buy':>16} {'Spread':>16} {'Sell':>16}",curses.color_pair(5)|curses.A_BOLD)
+        self.screen.addstr(1,21,f"{BuyPrice:16.{self.percision}f} {BuyPrice-SellPrice:16.{self.percision}f} {SellPrice:16.{self.percision}f}",curses.color_pair(6)|curses.A_BOLD)
+
+        if self.htype==0:
+            self.screen.addstr(0, 4,f"{'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1, 4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {BuyPrice:16.{self.percision}f}",curses.color_pair(cl)|curses.A_BOLD)
+            self.screen.addstr(0,72,f"{'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1,55,f"{SellPrice:16.{self.percision}f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(cr)|curses.A_BOLD)
+        elif self.htype==1:
+            self.screen.addstr(0, 4,f"{'Frequency':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1, 4,f"{buyFreq:16.0f} {BuyPrice:16.{self.percision}f}",curses.color_pair(cl)|curses.A_BOLD)
+            self.screen.addstr(0,62,f"{'Frequency':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1,55,f"{SellPrice:16.{self.percision}f} {sellFreq:16.0f}",curses.color_pair(cr)|curses.A_BOLD)
+        elif self.htype==2:
+            self.screen.addstr(0, 4,f"{'Volume':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1, 4,f"{buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f}",curses.color_pair(cl)|curses.A_BOLD)
+            self.screen.addstr(0,72,f"{'Volume':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(1,55,f"{SellPrice:16.{self.percision}f} {sell:16.{self.percision}f}",curses.color_pair(cr)|curses.A_BOLD)
+
+    def ShowRow(self,row,c,buyTotal,buyWeight,buyFreq,buy,BuyPrice,SellPrice,sell,sellFreq,sellWeight,sellTotal,maxLval,maxRval):
+        if self.direction=='long':
+            cl=curses.color_pair(4)
+            cr=curses.color_pair(4)
+        else:
+            cl=curses.color_pair(4)
+            cr=curses.color_pair(4)
+
+        # Row number
+        self.screen.addstr(row, 0,f"{c:3}",curses.color_pair(4))
+        # Spread
+        self.screen.addstr(row,38,f"{abs(BuyPrice-SellPrice):16.{self.percision}f}",curses.color_pair(4))
+
+        if BuyPrice==maxLval:
+            self.maxLvisable=True
+            cl=curses.color_pair(2)|curses.A_BOLD
+        if SellPrice==maxRval:
+            self.maxRvisable=True
+            cr=curses.color_pair(2)|curses.A_BOLD
+
+        # Highlight max prices
+        self.screen.addstr(row,21,f"{BuyPrice:16.{self.percision}f}",cl)
+        self.screen.addstr(row,55,f"{SellPrice:16.{self.percision}f}",cr)
+
+        if self.htype==0:
+            fwb=self.Div(buyWeight,buyTotal)*100
+            fws=self.Div(sellWeight,sellTotal)*100
+            if fwb==0:
+                cl=curses.color_pair(7)|curses.A_BOLD
+            if fws==0:
+                cr=curses.color_pair(7)|curses.A_BOLD
+            self.screen.addstr(row, 4,f"{fwb:16.4f}",cl)
+            self.screen.addstr(row,72,f"{fws:16.4f}",cr)
+        elif self.htype==1:
+            if buyFreq==0:
+                cl=curses.color_pair(7)|curses.A_BOLD
+            if sellFreq==0:
+                cr=curses.color_pair(7)|curses.A_BOLD
+            self.screen.addstr(row, 4,f"{buyFreq:16.0f}",cl)
+            self.screen.addstr(row,72,f"{sellFreq:16.0f}",cr)
+        elif self.htype==2:
+            if buy==0:
+                cl=curses.color_pair(7)|curses.A_BOLD
+            if sell==0:
+                cr=curses.color_pair(7)|curses.A_BOLD
+            self.screen.addstr(row, 4,f"{buy:16.{self.percision}f}",cl)
+            self.screen.addstr(row,72,f"{sell:16.{self.percision}f}",cr)
 
     def DisplayOanda(self):
         maxY,maxX=self.screen.getmaxyx()
 
-        if maxX<160:
-            print("Your screen is not wide enough. Please resize your window to at least 160 characters.")
+        # Be sure to count any leading spaces.
+        if maxX<(17*5)+4:
+            print(f"Your screen is not wide enough. Please resize your window to at least {(17*5)+4} characters.")
             curses.endwin()
             sys.exit(1)
 
@@ -252,6 +337,11 @@ class OrderBookAnalyzer():
             pp=cp
             idx+=1
 
+        # Trap unexpected empty list.
+
+        if obl==[]:
+            return
+
         # Frequency
         buyFreq=self.Bid[BuyPrice] if BuyPrice in self.Bid else 0
         sellFreq=self.Ask[SellPrice] if SellPrice in self.Ask else 0
@@ -262,70 +352,94 @@ class OrderBookAnalyzer():
         buyWeight=obl[buyIDX][3]
         sellWeight=obl[sellIDX][4]
 
-        # Wipe the screen
-        self.WipeScreen()
-
         ### Print table
-
-        self.screen.addstr(0,xpos,f"{Blank:3} {'FreqWeight':>16} {'Frequency':>16} {'Volume':>16} {'Buy':>16} {'Spread':>16} {'Sell':>16} {'Volume':>16} {'Frequency':>16} {'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
-        self.screen.addstr(1,xpos,f"{Blank:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f} {BuyPrice-SellPrice:16.{self.percision}f} {SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(6)|curses.A_BOLD)
-
-        if self.direction=='long':
-            self.screen.addstr(1,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f}",curses.color_pair(3)|curses.A_BOLD)
-        else:
-            self.screen.addstr(1,xpos+89,f"{SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(3)|curses.A_BOLD)
+        self.ShowHeader(buyTotal,buyWeight,buyFreq,buy,BuyPrice,SellPrice,sell,sellFreq,sellWeight,sellTotal)
 
         depth=maxY-2
 
         c=1
         maxBorders=0
         maxSorders=0
-        maxBprice=0
-        maxSprice=0
+        maxLval=0
+        maxRval=0
+        for i in range(len(obl)):      # depth
+            try:
+                buy=obl[buyIDX-i][0]
+                bprice=obl[buyIDX-i][1]
+                sprice=obl[sellIDX+i][1]
+                sell=obl[sellIDX+i][2]
+
+                buyWeight=obl[buyIDX-i][3]
+                sellWeight=obl[sellIDX+i][4]
+
+                buyFreq=obl[buyIDX-i][5]
+                sellFreq=obl[sellIDX+i][6]
+
+                if self.htype==0:           # FreqWeight
+                    if buyWeight>maxBorders:
+                        maxBorders=buyWeight
+                        maxLval=bprice
+                    if sellWeight>maxSorders:
+                        maxSorders=sellWeight
+                        maxRval=sprice
+                elif self.htype==1:           # Frequency
+                    if buyFreq>maxBorders:
+                        maxBorders=buyFreq
+                        maxLval=bprice
+                    if sellFreq>maxSorders:
+                        maxSorders=sellFreq
+                        maxRval=sprice
+                elif self.htype==2:           # Volume
+                    if buy>maxBorders:
+                        maxBorders=buy
+                        maxLval=bprice
+                    if sell>maxSorders:
+                        maxSorders=sell
+                        maxRval=sprice
+            except:
+                pass
+
         for i in range(depth):
             buy=obl[buyIDX-i][0]
             bprice=obl[buyIDX-i][1]
             sprice=obl[sellIDX+i][1]
             sell=obl[sellIDX+i][2]
-
-            buyWeight=obl[buyIDX-i][3]
-            sellWeight=obl[sellIDX+i][4]
-
-            buyFreq=obl[buyIDX-i][5]
-            sellFreq=obl[sellIDX+i][6]
-
-            if buyWeight>maxBorders:
-                maxBorders=buyWeight
-                maxBprice=bprice
-            if sellWeight>maxSorders:
-                maxSorders=sellWeight
-                maxSprice=sprice
-
-        for i in range(depth):
-            buy=obl[buyIDX-i][0]
-            bprice=obl[buyIDX-i][1]
-            sprice=obl[sellIDX+i][1]
-            sell=obl[sellIDX+i][2]
             buyWeight=obl[buyIDX-i][3]
             sellWeight=obl[sellIDX+i][4]
             buyFreq=obl[buyIDX-i][5]
             sellFreq=obl[sellIDX+i][6]
-            spread=abs(sprice-bprice)
 
-            self.screen.addstr(2+i,xpos,f"{c:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f} {spread:16.{self.percision}f} {sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(4))
-            if bprice==maxBprice:
-                self.screen.addstr(2+i,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f}",curses.color_pair(2)|curses.A_BOLD)
-            elif sprice==maxSprice:
-                self.screen.addstr(2+i,xpos+89,f"{sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(2)|curses.A_BOLD)
+            self.ShowRow(2+i,c,buyTotal,buyWeight,buyFreq,buy,bprice,sprice,sell,sellFreq,sellWeight,sellTotal,maxLval,maxRval)
+
             c+=1
+
+        # If max of buy side is off screen, put at last row
+        if not self.maxLvisable:
+            cl=curses.color_pair(2)|curses.A_BOLD
+            if self.htype==0:
+                self.screen.addstr(maxY-1, 4,f"{self.Div(maxBorders,buyTotal)*100:16.4f} {BuyPrice:16.{self.percision}f}",cl)
+            elif self.htype==1:
+                self.screen.addstr(maxY-1, 4,f"{maxBorders:16.0f} {BuyPrice:16.{self.percision}f}",cl)
+            elif self.htype==2:
+                self.screen.addstr(maxY-1, 4,f"{maxBorders:16.{self.percision}f} {buy:16.{self.percision}f}",cl)
+
+        # If max of sell side is off screen, put at last row
+        if not self.maxRvisable:
+            cr=curses.color_pair(2)|curses.A_BOLD
+            if self.htype==0:
+                self.screen.addstr(maxY-1,55,f"{SellPrice:16.{self.percision}f} {self.Div(maxSorders,sellTotal)*100:16.4f}",cr)
+            elif self.htype==1:
+                self.screen.addstr(maxY-1,55,f"{SellPrice:16.{self.percision}f} {maxSorders:16.0f}",cr)
+            elif self.htype==2:
+                self.screen.addstr(maxY-1,55,f"{SellPrice:16.{self.percision}f} {maxSorders:16.{self.percision}f}",cr)
 
         self.screen.refresh()
 
     def DisplayCCXT(self):
         maxY,maxX=self.screen.getmaxyx()
 
-        if maxX<160:
-            print("Your screen is not wide enough. Please resize your window to at least 160 characters.")
+        if maxX<(17*5)+4:
+            print(f"Your screen is not wide enough. Please resize your window to at least {(17*5)+4} characters.")
             curses.endwin()
             sys.exit(1)
 
@@ -339,7 +453,6 @@ class OrderBookAnalyzer():
 
         lp=0
         sp=0
-        l=min(len(self.OrderBook['asks']),len(self.OrderBook['bids']))
         buyIDX=0
         sellIDX=0
 
@@ -351,6 +464,7 @@ class OrderBookAnalyzer():
         buyTotal=0
         sellTotal=0
 
+        l=min(len(self.OrderBook['asks']),len(self.OrderBook['bids']))
         for ob in range(l):
             bprice=round(self.OrderBook['bids'][ob][0],self.percision)
             buy=self.OrderBook['bids'][ob][1] #*bprice
@@ -385,6 +499,9 @@ class OrderBookAnalyzer():
             ppS=cpS
             idx+=1
 
+        # Make sure this is > sell ticker
+        buyIDX-=1
+
         # Frequency
         buyFreq=self.Bid[BuyPrice] if BuyPrice in self.Bid else 0
         sellFreq=self.Ask[SellPrice] if SellPrice in self.Ask else 0
@@ -395,53 +512,59 @@ class OrderBookAnalyzer():
         sell=oblS[sellIDX][0]
         sellWeight=oblS[sellIDX][2]
 
-        # Wipe the screen
-        self.WipeScreen()
-
         ### Print table
-
-        self.screen.addstr(0,xpos,f"{Blank:3} {'FreqWeight':>16} {'Frequency':>16} {'Volume':>16} {'Buy':>16} {'Spread':>16} {'Sell':>16} {'Volume':>16} {'Frequency':>16} {'FreqWeight':>16}",curses.color_pair(5)|curses.A_BOLD)
-        self.screen.addstr(1,xpos,f"{Blank:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f} {BuyPrice-SellPrice:16.{self.percision}f} {SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(6)|curses.A_BOLD)
-
-        if self.direction=='long':
-            self.screen.addstr(1,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {BuyPrice:16.{self.percision}f}",curses.color_pair(3)|curses.A_BOLD)
-        else:
-            self.screen.addstr(1,xpos+89,f"{SellPrice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(3)|curses.A_BOLD)
+        self.ShowHeader(buyTotal,buyWeight,buyFreq,buy,BuyPrice,SellPrice,sell,sellFreq,sellWeight,sellTotal)
 
         depth=min(maxY-2,len(oblB)-1,len(oblS)-1)
 
         c=1
         maxBorders=0
         maxSorders=0
-        maxBprice=0
-        maxSprice=0
-        for i in range(depth):
+        maxLval=0
+        maxRval=0
+        l=min(len(oblB),len(oblS))
+        for i in range(l):  # depth
             try:
-                buy=oblB[buyIDX+i][0]
-                bprice=oblB[buyIDX+i][1]
-                buyWeight=oblB[buyIDX+i][2]
-                buyFreq=oblB[buyIDX+i][3]
+                buy=oblB[buyIDX-i][0]
+                bprice=oblB[buyIDX-i][1]
+                buyWeight=oblB[buyIDX-i][2]
+                buyFreq=oblB[buyIDX-i][3]
 
                 sell=oblS[sellIDX+i][0]
                 sprice=oblS[sellIDX+i][1]
                 sellWeight=oblS[sellIDX+i][2]
                 sellFreq=oblS[sellIDX+i][3]
 
-                if buyWeight>maxBorders:
-                    maxBorders=buyWeight
-                    maxBprice=bprice
-                if sellWeight>maxSorders:
-                    maxSorders=sellWeight
-                    maxSprice=sprice
+                if self.htype==0:           # FreqWeight
+                    if buyWeight>maxBorders:
+                        maxBorders=buyWeight
+                        maxLval=bprice
+                    if sellWeight>maxSorders:
+                        maxSorders=sellWeight
+                        maxRval=sprice
+                elif self.htype==1:           # Frequency
+                    if buyFreq>maxBorders:
+                        maxBorders=buyFreq
+                        maxLval=bprice
+                    if sellFreq>maxSorders:
+                        maxSorders=sellFreq
+                        maxRval=sprice
+                elif self.htype==2:           # Volume
+                    if buy>maxBorders:
+                        maxBorders=buy
+                        maxLval=bprice
+                    if sell>maxSorders:
+                        maxSorders=sell
+                        maxRval=sprice
             except:
                 break
 
         for i in range(depth):
             try:
-                buy=oblB[buyIDX+i][0]
-                bprice=oblB[buyIDX+i][1]
-                buyWeight=oblB[buyIDX+i][2]
-                buyFreq=oblB[buyIDX+i][3]
+                buy=oblB[buyIDX-i][0]
+                bprice=oblB[buyIDX-i][1]
+                buyWeight=oblB[buyIDX-i][2]
+                buyFreq=oblB[buyIDX-i][3]
 
                 sell=oblS[sellIDX+i][0]
                 sprice=oblS[sellIDX+i][1]
@@ -449,14 +572,31 @@ class OrderBookAnalyzer():
                 sellFreq=oblS[sellIDX+i][3]
                 spread=abs(sprice-bprice)
 
-                self.screen.addstr(2+i,xpos,f"{c:3} {self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f} {spread:16.{self.percision}f} {sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(4))
-                if bprice==maxBprice:
-                    self.screen.addstr(2+i,xpos+4,f"{self.Div(buyWeight,buyTotal)*100:16.4f} {buyFreq:16.0f} {buy:16.{self.percision}f} {bprice:16.{self.percision}f}",curses.color_pair(2)|curses.A_BOLD)
-                elif sprice==maxSprice:
-                    self.screen.addstr(2+i,xpos+89,f"{sprice:16.{self.percision}f} {sell:16.{self.percision}f} {sellFreq:16.0f} {self.Div(sellWeight,sellTotal)*100:16.4f}",curses.color_pair(2)|curses.A_BOLD)
+                self.ShowRow(2+i,c,buyTotal,buyWeight,buyFreq,buy,bprice,sprice,sell,sellFreq,sellWeight,sellTotal,maxLval,maxRval)
+
                 c+=1
             except:
                 break
+
+        # If max of buy side is off screen, put at last row
+        if not self.maxLvisable:
+            cl=curses.color_pair(2)|curses.A_BOLD
+            if self.htype==0:
+                self.screen.addstr(maxY-1, 4,f"{self.Div(maxBorders,buyTotal)*100:16.4f} {maxLval:16.{self.percision}f}",cl)
+            elif self.htype==1:
+                self.screen.addstr(maxY-1, 4,f"{maxBorders:16.0f} {maxLval:16.{self.percision}f}",cl)
+            elif self.htype==2:
+                self.screen.addstr(maxY-1, 4,f"{maxBorders:16.{self.percision}f} {maxLval:16.{self.percision}f}",cl)
+
+        # If max of sell side is off screen, put at last row
+        if not self.maxRvisable:
+            cr=curses.color_pair(2)|curses.A_BOLD
+            if self.htype==0:
+                self.screen.addstr(maxY-1,55,f"{maxRval:16.{self.percision}f} {self.Div(maxSorders,sellTotal)*100:16.4f}",cr)
+            elif self.htype==1:
+                self.screen.addstr(maxY-1,55,f"{maxRval:16.{self.percision}f} {maxSorders:16.0f}",cr)
+            elif self.htype==2:
+                self.screen.addstr(maxY-1,55,f"{maxRval:16.{self.percision}f} {maxSorders:16.{self.percision}f}",cr)
 
         self.screen.refresh()
 
@@ -521,6 +661,7 @@ def main(screen):
     Config=ReadConfig(exchange,account,asset)
 
     fwoba=OrderBookAnalyzer(screen=screen,exchange=exchange,account=account,asset=asset,direction=direction,percision=Config['Percision'])
+    oldch=None
 
     while True:
         # Get 0-8 gor percision
@@ -533,13 +674,24 @@ def main(screen):
             fwoba.percision=ch-ord('0')
             fwoba.screen.clear()
 
+        if ch==ord(' '):
+            fwoba.htype=(fwoba.htype+1)%3
+        if ch==ord('W') or ch==ord('w'):
+            fwoba.htype=0
+        if ch==ord('F') or ch==ord('f'):
+            fwoba.htype=1
+        if ch==ord('V') or ch==ord('v'):
+            fwoba.htype=2
+
         fwoba.LoadTickerData()
         if fwoba.relay.Framework=='ccxt':
             fwoba.DisplayCCXT()
         else:
             fwoba.DisplayOanda()
 
-        JRRsupport.ElasticSleep(1)
+        if oldch==ch:
+            JRRsupport.ElasticSleep(1)
+        oldch=ch
 
     # shut everything down
     curses.endwin()

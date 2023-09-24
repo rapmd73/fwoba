@@ -44,8 +44,6 @@ This screen shot shows EUR/USD being analyzed by volume.
 
 ## Installing
 
-**DO THIS ONLY ONCE**. It will overwrite the .cfg file
-
 Start with these shell commands
 
 ```bash
@@ -219,6 +217,9 @@ decisions. Here is a list of the keys and their purpose in the program:
 1. **q** or **Q**. Gracefully quit the program and return to the command prompt.
 1. **1** to **8**. Digits after the decimal for vireing and correlating different zonwes and regions in the orderbook.
 1. **Space Bar**. Cycle through the various displays highlight by frequency weight, frequeny, and volume.
+1. **w** or **W**. Switch to the frequency weighted table.
+1. **f** or **F**. Switch to the frequency counting table.
+1. **v** or **v**. Switch to the volume table.
 
 ### Columns
 
