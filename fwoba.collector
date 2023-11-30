@@ -251,17 +251,17 @@ def main():
                 fw.Lock()
                 sData=json.loads(fwobaMemory[cfg].Get())
                 fw.Unlock()
-                dsStatus=None
+                status=None
 
                 if 'DataStore' in sData:
-                    dsStatus=sData['DataStore'].lower()
+                    status=sData['DataStore'].lower()
                 else:
                     status=sData['Status'].lower()
 
                 # is status is NoData or DataStore status is done, then sweep this pair again. This is absolutely critical to make
                 # sure only 1 process is managing a single pair.
 
-                if status=='notfound' or dsStatus=='done':
+                if status=='notfound' or status=='done':
                     fw.Lock()
                     fwobaMemory[cfg].Put(fwobaTimeout*100,"Running")
                     Config[cfg]['Relay']=fwobaRelay[cfg]
