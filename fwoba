@@ -225,7 +225,7 @@ class OrderBookAnalyzer():
         elif self.htype==1:
             self.screen.addstr(0, 4,f"{'Frequency':>16}",curses.color_pair(5)|curses.A_BOLD)
             self.screen.addstr(1, 4,f"{buyFreq:16.0f} {BuyPrice:16.{self.percision}f}",curses.color_pair(cl)|curses.A_BOLD)
-            self.screen.addstr(0,62,f"{'Frequency':>16}",curses.color_pair(5)|curses.A_BOLD)
+            self.screen.addstr(0,72,f"{'Frequency':>16}",curses.color_pair(5)|curses.A_BOLD)
             self.screen.addstr(1,55,f"{SellPrice:16.{self.percision}f} {sellFreq:16.0f}",curses.color_pair(cr)|curses.A_BOLD)
         elif self.htype==2:
             self.screen.addstr(0, 4,f"{'Volume':>16}",curses.color_pair(5)|curses.A_BOLD)
