@@ -5,6 +5,10 @@
 # 2021 Copyright © Robert APM Darin
 # All rights reserved unconditionally.
 
+# OrderBook collection and storage needs to be re-evaluated. Data requirements are extreme and CPU load is
+# high. Realistacly, a separate database (Redis with timed data expiration) will be need to catalogue the
+# extreme data flow.
+
 import sys
 sys.path.append('/home/JackrabbitRelay2/Base/Library')
 import os
@@ -30,7 +34,7 @@ interceptor=JRRsupport.SignalInterceptor(Log=Log)
 
 # For memory DB
 
-fwobaTimeout=1*60
+fwobaTimeout=5*60
 
 ###
 ### Collector class
@@ -51,6 +55,7 @@ class Collector():
         self.TickerUpdate=False
         self.oldticker=None
         self.ticker=None
+        self.orderbook=None
         self.TickerList=[]
 
         # Initialize global signal interceptor. prevent file trashing on CTRL-C
@@ -89,7 +94,12 @@ class Collector():
                     continue
                 try:
                     td=json.loads(line)
+                    if 'TickerList' in td:
+                        td.pop('TickerList',None)
+                    if 'OrderBook' in td:
+                        td.pop('OrderBook',None)
                     self.TickerList.append(td)
+
                 except: # damaged, skip
                     pass
 
@@ -108,6 +118,10 @@ class Collector():
             self.TickerUpdate=True
 
         self.TickerList=self.TickerList[-self.history:]
+
+        # Store orderbook for volume and frequency weighted analysis.
+        #self.GetOrderBook()
+
         if self.TickerUpdate==True:
             self.SaveTickerData()
 
@@ -132,6 +146,10 @@ class Collector():
 
     def GetTicker(self):
         self.ticker=self.relay.GetTicker(symbol=self.Asset)
+
+    def GetOrderBook(self):
+        self.orderbook=self.relay.GetOrderBook(symbol=self.Asset)
+        self.TickerList[-1]['OrderBook']=self.orderbook
 
     def DuplicateTicker(self):
         if self.oldticker==None or self.ticker==None:
@@ -193,7 +211,11 @@ def LoadSingleTicker(Config):
 
     if Config['Diagnostics']=='yes':
         if not TickerCollect.DuplicateTicker():
-            print(Config['Pair'],TickerCollect.ticker)
+            print(Config['Pair'],TickerCollect.ticker['Bid'],TickerCollect.ticker['Spread'],TickerCollect.ticker['Ask'])
+#            print(Config['Pair'],TickerCollect.ticker['Bid'],TickerCollect.ticker['Spread'],TickerCollect.ticker['Ask'],len(TickerCollect.TickerList[-1]['OrderBook']))
+    # Flush memory to keep OOM happy
+    TickerCollect.TickerList=None
+    gc.collect()
 
 def SpawnLoadSingleTicker(*args,**kwargs):
     Config=kwargs
@@ -208,7 +230,7 @@ def SpawnLoadSingleTicker(*args,**kwargs):
     fw=JRRsupport.Locker(Config['Key'],Timeout=fwobaTimeout)
     fwobaMemory=JRRsupport.Locker(Config['Pair'],ID=Config['mID'],Timeout=fwobaTimeout)
     fw.Lock()
-    fwobaMemory.Put(fwobaTimeout*5,"Done")
+    fwobaMemory.Put(fwobaTimeout,"Done")
     fw.Unlock()
 
 ###
@@ -218,7 +240,7 @@ def SpawnLoadSingleTicker(*args,**kwargs):
 def main():
     global NumberProcesses
 
-    if len(sys.argv)>2:
+    if len(sys.argv)>1:
         NumberProcesses=int(sys.argv[1])
         if NumberProcesses<1:
             NumberProcesses=os.cpu_count()
@@ -263,7 +285,7 @@ def main():
 
                 if status=='notfound' or status=='done':
                     fw.Lock()
-                    fwobaMemory[cfg].Put(fwobaTimeout*100,"Running")
+                    fwobaMemory[cfg].Put(fwobaTimeout,"Running")
                     Config[cfg]['Relay']=fwobaRelay[cfg]
                     Config[cfg]['mID']=fwobaMemory[cfg].ID
                     fw.Unlock()
@@ -274,6 +296,7 @@ def main():
                 while interceptor.GetChildren()>(NumberProcesses-1):
                     JRRsupport.ElasticSleep(1)
             else:
+                Config[cfg]['Relay']=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'])
                 LoadSingleTicker(Config[cfg])
 
         JRRsupport.ElasticSleep(1)
@@ -284,3 +307,4 @@ if __name__ == '__main__':
 ###
 ### End of program
 ###
+

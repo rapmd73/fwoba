@@ -171,6 +171,8 @@ class OrderBookAnalyzer():
                     continue
                 try:
                     td=json.loads(line)
+                    if 'OrderBook' in td:
+                        td.pop('OrderBook',None)
                     self.TickerList.append(td)
                 except: # damaged, skip
                     pass
