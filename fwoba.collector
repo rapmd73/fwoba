@@ -41,7 +41,7 @@ fwobaTimeout=5*60
 ###
 
 class Collector():
-    def __init__(self,exchange,account,asset,history=None):
+    def __init__(self,exchange,account,asset,saveOB=False,history=None):
         # Initialize class operationing requirements
         self.TickerDataDir='/home/fwoba/TickerData/'
         self.Exchange=exchange.lower()
@@ -50,8 +50,11 @@ class Collector():
         self.history=85400
         if history!=None:
             self.history=int(history)
-        self.tickerfile=self.TickerDataDir+self.Exchange+'.'+self.Account+'.'+self.Asset.replace('/','')+'.ticker'
+        self.tickerfile=self.TickerDataDir+self.Exchange+'.'+self.Account+'.'+self.Asset.replace('/','').replace('-','').replace(':','')+'.ticker'
         self.filelock=JRRsupport.Locker(self.tickerfile)
+        self.saveOB=False
+        if saveOB==True:
+            self.saveOB=saveOB
         self.TickerUpdate=False
         self.oldticker=None
         self.ticker=None
@@ -63,7 +66,7 @@ class Collector():
         self.Log=JRR.JackrabbitLog()
         self.interceptor=JRRsupport.SignalInterceptor(Log=self.Log)
 
-        # Prime for Jackrabbit Relay
+        # Prime for Jackrabbit Relay for THIS processes. Each process MUST have its own SSL connection.
         self.relay=JRR.JackrabbitRelay(exchange=self.Exchange,account=self.Account,asset=self.Asset,Usage=self.Help)
 
     def Help(self,args,argslen):
@@ -76,6 +79,9 @@ class Collector():
     # Load ticker data
 
     def LoadTickerData(self):
+        # Prime for Jackrabbit Relay for THIS processes.
+        self.relay=JRR.JackrabbitRelay(exchange=self.Exchange,account=self.Account,asset=self.Asset,Usage=self.Help)
+
         self.GetTicker()
         # Reset and reload
         self.TickerList=[]
@@ -94,10 +100,6 @@ class Collector():
                     continue
                 try:
                     td=json.loads(line)
-                    if 'TickerList' in td:
-                        td.pop('TickerList',None)
-                    if 'OrderBook' in td:
-                        td.pop('OrderBook',None)
                     self.TickerList.append(td)
 
                 except: # damaged, skip
@@ -140,8 +142,21 @@ class Collector():
                 fh.write(json.dumps(ticker)+'\n')
             ot=ticker
         fh.close()
+
+        # Save orderbook
+        if self.saveOB==True:
+            self.GetOrderBook()
+            dt=self.TickerList[-1]['DateTime'].split(' ')[0]
+            tfn=self.TickerDataDir+dt+'.'+self.Exchange+'.'+self.Account+'.'+self.Asset.replace('/','')+'.orderbook'
+            ob={}
+            ob['DateTime']=self.TickerList[-1]['DateTime']
+            ob['OrderBook']=self.orderbook
+            tstr=json.dumps(ob)+'\n'
+            JRRsupport.AppendFile(tfn,tstr)
+
         self.filelock.Unlock()
         self.interceptor.Critical(False)
+
         self.interceptor.SafeExit()
 
     def GetTicker(self):
@@ -149,7 +164,6 @@ class Collector():
 
     def GetOrderBook(self):
         self.orderbook=self.relay.GetOrderBook(symbol=self.Asset)
-        self.TickerList[-1]['OrderBook']=self.orderbook
 
     def DuplicateTicker(self):
         if self.oldticker==None or self.ticker==None:
@@ -206,13 +220,16 @@ def ReadConfig():
     return Config
 
 def LoadSingleTicker(Config):
+
+    # This is a weird paradox as the connection is actually re-established to prevent "Man in the Middle"
+    # attacks
+
     TickerCollect=Config['Relay']
     TickerCollect.LoadTickerData()
 
     if Config['Diagnostics']=='yes':
         if not TickerCollect.DuplicateTicker():
             print(Config['Pair'],TickerCollect.ticker['Bid'],TickerCollect.ticker['Spread'],TickerCollect.ticker['Ask'])
-#            print(Config['Pair'],TickerCollect.ticker['Bid'],TickerCollect.ticker['Spread'],TickerCollect.ticker['Ask'],len(TickerCollect.TickerList[-1]['OrderBook']))
     # Flush memory to keep OOM happy
     TickerCollect.TickerList=None
     gc.collect()
@@ -263,7 +280,11 @@ def main():
         for cfg in Config:
             if NumberProcesses>1:
                 if cfg not in fwobaRelay:
-                    fwobaRelay[cfg]=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'])
+                    saveOB=False
+                    if 'OrderBook' in Config[cfg]:
+                        saveOB=True
+                    fwobaRelay[cfg]=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'],saveOB=saveOB)
+                    JRRsupport.ElasticSleep(1)
 
                 if cfg not in fwobaMemory:
                     fwobaMemory[cfg]=JRRsupport.Locker(cfg,Timeout=fwobaTimeout)
@@ -296,7 +317,11 @@ def main():
                 while interceptor.GetChildren()>(NumberProcesses-1):
                     JRRsupport.ElasticSleep(1)
             else:
-                Config[cfg]['Relay']=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'])
+                saveOB=False
+                if 'OrderBook' in Config[cfg]:
+                    saveOB=True
+
+                Config[cfg]['Relay']=Collector(Config[cfg]['Exchange'],Config[cfg]['Account'],Config[cfg]['Asset'],history=Config[cfg]['History'],saveOB=saveOB)
                 LoadSingleTicker(Config[cfg])
 
         JRRsupport.ElasticSleep(1)
