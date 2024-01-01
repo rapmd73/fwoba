@@ -7,6 +7,6 @@ cd /home/GitHub/fwoba
 
 mkdir -p $BaseDir > /dev/null 2>&1
 mkdir -p $TickDir > /dev/null 2>&1
-#git pull https://github.com/rapmd73/fwoba
+git pull https://github.com/rapmd73/fwoba
 
 cp -r * /home/fwoba > /dev/null 2>&1
